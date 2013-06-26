@@ -113,7 +113,7 @@ static void _flex_mapper_buildid_section(struct flex_elf *fe, Elf_Scn *scn, void
   ptrdiff_t diff = 0;
   while (diff < nhdr->n_descsz)
     {
-      sprintf(&(*buildid)[diff * 2], "%0x", *(uint32_t *)&elf_buildid[diff]);
+      sprintf(&(*buildid)[diff * 2], "%08x", *(uint32_t *)&elf_buildid[diff]);
       diff += sizeof(uint32_t);
     }
 
