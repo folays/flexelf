@@ -1,0 +1,61 @@
+===================================================================
++++ config.m4
++  dnl ELF_LIBS="-lelf"
++  dnl PHP_EVAL_LIBLINE($ELF_LIBS, ELF_SHARED_LIBADD)
++
++  PHP_CHECK_LIBRARY(elf, elf_begin,
++  [
++    AC_DEFINE(HAVE_ELFLIB,1,[ ])
++    PHP_ADD_LIBRARY_WITH_PATH(elf, [], VHOST_FLEX_SHARED_LIBADD)
++  ],[
++    AC_MSG_ERROR([wrong elf lib version or lib not found])
++  ],[
++    -lelf
++  ])
++
++  CFLAGS="-DFLEX_OFFSET_LIST_FCGI_ACCEPT_REQUEST=$(./get_offset_address_list.pl -symbol=fcgi_accept_request)"
++
++  PHP_NEW_EXTENSION(vhost_flex, [vhost_flex.c flexelf.c], $ext_shared, , $CFLAGS)
++  PHP_SUBST(VHOST_FLEX_SHARED_LIBADD)
+===================================================================
++++ prepare_build.sh
++# apt-get install libelf-dev
+===================================================================
++++ vhost_flex.h
+-#define FLEX_JAIL
++#define FLEX_BINARY_SELF       "/proc/self/exe"
++#define FLEX_BINARY_DBG                "/usr/lib/debug/usr/bin/php5-cgi"
+
+/* #define FLEX_JAIL */
+===================================================================
++++ vhost_flex.c
++#include "flexelf.h"
++
+@@
++void flex_accept_request_done(void *request, char *(*f_getenv)(), void (*f_putenv)());
++
++/* ./get_offset_address_list.pl -symbol=fcgi_accept_request generate a list of offset where
++ *   the "jump" asm instruction should be replaced by our hook.
++ */
++static long gl_flex_offset_list[] = {FLEX_OFFSET_LIST_FCGI_ACCEPT_REQUEST};
++static void _flex_replace_offset_list()
++{
++       syslog(XLOG, "%s : our hook is at %p for a non-static address, for a static address it could be %p", __func__, flex_accept_request_done, _flex_replace_offset_list);
++}
+@@
++       char *buildid_self = _flex_elf_get_buildid(FLEX_BINARY_SELF);
++       char *buildid_dbg = _flex_elf_get_buildid(FLEX_BINARY_DBG);
++       syslog(XLOG, "%s : BuildID %s 0x%s %s 0x%s", __func__, FLEX_BINARY_SELF, buildid_self, FLEX_BINARY_DBG, buildid_dbg);
++       if (!(buildid_self && buildid_dbg) || strcmp(buildid_self, buildid_dbg))
++               {
++                       syslog(XLOG, "%s : BuildID don't match, abort.", __func__);
++                       return FAILURE;
++               }
++       f_flex_getenv = _flex_elf_get_sym(FLEX_BINARY_DBG, "fcgi_getenv");
++       f_flex_putenv = _flex_elf_get_sym(FLEX_BINARY_DBG, "fcgi_putenv");
++       if (!(f_flex_getenv && f_flex_putenv))
++               {
++                       syslog(XLOG, "%s : coult not get symbol address", __func__);
++                       return FAILURE;
++               }
++       _flex_replace_offset_list();
